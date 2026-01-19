@@ -425,3 +425,7 @@ If you use sklearn-diagnose in your research, please cite:
   url = {https://github.com/leockl/sklearn-diagnose}
 }
 ```
+
+---
+
+Please give my GitHub repo a ⭐ if this was helpful. Thank you!
