@@ -218,17 +218,7 @@ report.signals.to_dict()        # Convert to dict for serialization
 
 ### Evidence-Based Diagnosis
 
-Every hypothesis is backed by quantitative evidence:
-
-```python
-# Simplified overfitting detection rule (actual implementation is more nuanced)
-if train_score - val_score > 0.15 and train_score > 0.8:
-    hypothesis = Hypothesis(
-        name=FailureMode.OVERFITTING,
-        confidence=min(0.95, 0.5 + (train_score - val_score)),
-        evidence=[f"Train-val gap of {(train_score - val_score)*100:.1f}% is severe"]
-    )
-```
+Every hypothesis is backed by quantitative evidence. The LLM analyzes deterministic signals and generates hypotheses with confidence scores
 
 ### Confidence Scoring & Guardrails
 
@@ -307,7 +297,30 @@ setup_llm(provider="openrouter", model="deepseek/deepseek-r1-0528", api_key="sk-
 
 ### Using Environment Variables
 
-You can set API keys via environment variables or a `.env` file:
+You can set API keys via environment variables in two ways:
+
+**Option 1: Set programmatically in Python**
+
+```python
+import os
+from sklearn_diagnose import setup_llm
+
+# Set environment variable in your code
+os.environ["OPENAI_API_KEY"] = "sk-..."
+setup_llm(provider="openai", model="gpt-4o")  # api_key is automatically loaded
+
+# Or for Anthropic
+os.environ["ANTHROPIC_API_KEY"] = "sk-ant-..."
+setup_llm(provider="anthropic", model="claude-3-5-sonnet-latest")
+
+# Or for OpenRouter
+os.environ["OPENROUTER_API_KEY"] = "sk-or-..."
+setup_llm(provider="openrouter", model="deepseek/deepseek-r1-0528")
+```
+
+**Option 2: Use a `.env` file (recommended for production)**
+
+Create a `.env` file in your project root:
 
 ```bash
 # .env file
@@ -316,10 +329,12 @@ ANTHROPIC_API_KEY=sk-ant-...
 OPENROUTER_API_KEY=sk-or-...
 ```
 
+The library uses `python-dotenv` internally to automatically load the `.env` file (no need to import or call load_dotenv() yourself):
+
 ```python
 from sklearn_diagnose import setup_llm
 
-# API key is automatically loaded from environment
+# API keys are automatically loaded from .env file
 setup_llm(provider="openai", model="gpt-4o")
 setup_llm(provider="anthropic", model="claude-3-5-sonnet-latest")
 setup_llm(provider="openrouter", model="deepseek/deepseek-r1-0528")

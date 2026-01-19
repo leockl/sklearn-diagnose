@@ -145,3 +145,5 @@ Thumbs.db
 *.log
 .env.local
 .env.*.local
+test_llm_providers.py
+TEST_RESULTS.md
