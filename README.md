@@ -303,17 +303,12 @@ from sklearn_diagnose import setup_llm
 
 # Using OpenAI
 setup_llm(provider="openai", model="gpt-4o", api_key="sk-...")
-setup_llm(provider="openai", model="gpt-4o-mini", api_key="sk-...")
-setup_llm(provider="openai", model="gpt-4.1-mini", api_key="sk-...")
 
 # Using Anthropic
 setup_llm(provider="anthropic", model="claude-3-5-sonnet-latest", api_key="sk-ant-...")
-setup_llm(provider="anthropic", model="claude-3-haiku-20240307", api_key="sk-ant-...")
 
 # Using OpenRouter (access to many models)
 setup_llm(provider="openrouter", model="deepseek/deepseek-r1-0528", api_key="sk-or-...")
-setup_llm(provider="openrouter", model="openai/gpt-4o", api_key="sk-or-...")
-setup_llm(provider="openrouter", model="anthropic/claude-3.5-sonnet", api_key="sk-or-...")
 ```
 
 ### Using Environment Variables
