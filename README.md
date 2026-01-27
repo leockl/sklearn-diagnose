@@ -20,6 +20,7 @@ sklearn-diagnose acts as an "MRI scanner" for your machine learning models — i
 ## Key Features
 
 - **Model Failure Diagnosis**: Detect overfitting, underfitting, high variance, label noise, feature redundancy, class imbalance, and data leakage symptoms
+- **Interactive Chatbot**: Launch a web-based chatbot to have conversations about your diagnosis results
 - **Cross-Validation Interpretation**: CV interpretation is a core signal extractor within sklearn-diagnose, used to detect instability, overfitting, and potential data leakage
 - **Evidence-Based Hypotheses**: All diagnoses include confidence scores and supporting evidence
 - **Actionable Recommendations**: Get specific suggestions to fix identified issues
@@ -37,6 +38,14 @@ This installs sklearn-diagnose with all required dependencies including:
 - **langchain-openai** for OpenAI model support
 - **langchain-anthropic** for Anthropic model support
 - **python-dotenv** for environment variable management
+
+### Interactive Chatbot Included
+
+The interactive chatbot feature is included by default! When you install sklearn-diagnose, you get:
+- **FastAPI** for the web server
+- **Uvicorn** for running the server
+- **python-multipart** for form handling
+- **Bundled React frontend** - no Node.js or npm required!
 
 ## Quick Start
 
@@ -133,6 +142,128 @@ report = diagnose(
     },
     task="classification",
     cv_results=cv_results
+)
+```
+
+### Interactive Chatbot
+
+Launch an interactive web-based chatbot to explore your diagnosis results through natural conversation with an LLM.
+
+#### Features
+
+- **Interactive Q&A**: Ask questions about your diagnosis results in natural language
+- **Full Context**: The chatbot has complete access to all detected issues, recommendations, and model signals
+- **Code Examples**: Get implementation help with ready-to-use code snippets
+- **Conversation History**: Maintains context throughout your session
+- **Markdown Rendering**: Formatted responses with syntax highlighting
+- **Responsive UI**: Modern React interface with Tailwind CSS
+
+#### Installation
+
+Simply install sklearn-diagnose:
+
+```bash
+pip install sklearn-diagnose
+```
+
+The chatbot dependencies (FastAPI, Uvicorn, python-multipart) are included by default. **The React frontend is bundled** - no Node.js or npm required!
+
+#### Usage
+
+**Just ONE terminal, ONE Python script:**
+
+```python
+from sklearn_diagnose import setup_llm, diagnose, launch_chatbot
+
+# 1. Configure LLM
+setup_llm(provider="openai", model="gpt-4o", api_key="sk-...")
+
+# 2. Diagnose your model
+report = diagnose(
+    estimator=model,
+    datasets={"train": (X_train, y_train), "val": (X_val, y_val)},
+    task="classification"
+)
+
+# 3. Launch chatbot (opens browser automatically)
+launch_chatbot(report)
+```
+
+That's it! The browser opens automatically to **http://localhost:8000** and you can start chatting.
+
+Works on both Windows and Mac/Linux - no platform-specific setup needed!
+
+#### Complete Example
+
+Run the provided example script:
+
+```bash
+# On Windows
+python tests/example_diagnose.py
+
+# On Mac/Linux
+python3 tests/example_diagnose.py
+```
+
+This will:
+1. Generate synthetic test data with deliberate issues
+2. Train a model
+3. Run diagnosis
+4. Launch the chatbot automatically
+
+#### Example Questions
+
+Once the chatbot is running, try asking:
+
+- "What are the main issues with my model?"
+- "How do I fix the class imbalance?"
+- "Show me code to implement your first recommendation"
+- "Why is feature redundancy a problem?"
+- "What causes overfitting in my case?"
+- "How do I tune the decision threshold?"
+
+#### Chatbot Architecture
+
+```
+Browser (http://localhost:8000)
+         ↓
+FastAPI Server (serves both frontend & API)
+  ├── /assets/*     → Static files (JS, CSS)
+  ├── /api/*        → REST API endpoints
+  └── /*            → React frontend (SPA)
+         ↓
+ChatAgent (maintains conversation history)
+         ↓
+LLM Client (OpenAI/Anthropic/OpenRouter)
+```
+
+#### Troubleshooting
+
+**Chat responses not working:**
+- Verify you called `setup_llm()` before `diagnose()`
+- Check your API key is valid in `.env` file or environment variables
+
+**Port already in use:**
+- Default port is 8000
+- Change if needed: `launch_chatbot(report, port=9000)`
+
+**Browser doesn't open automatically:**
+- Manually navigate to http://localhost:8000
+
+**"Frontend not built" error:**
+- This shouldn't happen with pip install
+- If developing from source, run: `cd frontend && npm run build`
+
+#### Customization
+
+Configure the chatbot server:
+
+```python
+launch_chatbot(
+    report,
+    host="127.0.0.1",       # Server host
+    port=8000,               # Server port
+    auto_open_browser=True   # Auto-open browser
 )
 ```
 
@@ -345,7 +476,7 @@ setup_llm(provider="openrouter", model="deepseek/deepseek-r1-0528")
 ```
 sklearn-diagnose/                 # Project root
 ├── sklearn_diagnose/             # Main package
-│   ├── __init__.py               # Package exports (setup_llm, diagnose, types)
+│   ├── __init__.py               # Package exports (setup_llm, diagnose, launch_chatbot, types)
 │   ├── api/
 │   │   ├── __init__.py
 │   │   └── diagnose.py           # Main diagnose() function
@@ -356,13 +487,31 @@ sklearn-diagnose/                 # Project root
 │   │   ├── signals.py            # Signal extraction (deterministic metrics)
 │   │   ├── hypotheses.py         # Rule-based hypotheses (fallback/reference)
 │   │   └── recommendations.py    # Example recommendation templates for LLM guidance
-│   └── llm/
-│       ├── __init__.py           # Exports setup_llm and LLM utilities
-│       └── client.py             # LangChain-based AI agents (hypothesis, recommendation, summary)
+│   ├── llm/
+│   │   ├── __init__.py           # Exports setup_llm and LLM utilities
+│   │   └── client.py             # LangChain-based AI agents (hypothesis, recommendation, summary)
+│   ├── server/                   # Chatbot backend (NEW)
+│   │   ├── __init__.py
+│   │   ├── app.py                # FastAPI application with CORS and routes
+│   │   └── chat_agent.py         # ChatAgent for conversation management
+│   └── chatbot.py                # Chatbot launcher function
+├── frontend/                     # React chatbot UI (NEW)
+│   ├── src/
+│   │   ├── components/           # React components (Header, ChatInterface, etc.)
+│   │   ├── hooks/                # Custom hooks (useChat)
+│   │   ├── services/             # API client
+│   │   ├── App.jsx               # Main React app
+│   │   ├── main.jsx              # React entry point
+│   │   └── index.css             # Global styles with Tailwind
+│   ├── package.json              # Node dependencies
+│   ├── vite.config.js            # Vite configuration with API proxy
+│   ├── tailwind.config.js        # Tailwind CSS config
+│   └── index.html                # HTML entry point
 ├── tests/
 │   ├── __init__.py
 │   ├── conftest.py               # Pytest fixtures and MockLLMClient for testing
-│   └── test_diagnose.py          # Comprehensive test suite
+│   ├── unit_test_diagnose.py     # Comprehensive test suite (includes chatbot tests)
+│   └── example_diagnose.py       # Example script demonstrating full workflow with chatbot
 ├── .github/
 │   └── workflows/
 │       └── tests.yml             # GitHub Actions CI (runs tests on push/PR)

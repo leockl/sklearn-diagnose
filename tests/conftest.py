@@ -306,10 +306,109 @@ class MockLLMClient(LLMClient):
 def setup_mock_llm():
     """
     Configure mock LLM client before each test.
-    
+
     This fixture runs automatically for all tests (autouse=True).
     It sets up the MockLLMClient before each test and clears it after.
     """
     _set_global_client(MockLLMClient())
     yield
     _set_global_client(None)
+
+
+# ============================================================================
+# Chatbot-specific fixtures
+# ============================================================================
+
+@pytest.fixture
+def sample_diagnosis_report():
+    """
+    Create a sample diagnosis report for chatbot testing.
+
+    This fixture creates a minimal but realistic DiagnosisReport that can be
+    used to test the ChatAgent and API endpoints.
+    """
+    from sklearn_diagnose.core.schemas import (
+        DiagnosisReport, Hypothesis, Recommendation, Signals, TaskType, FailureMode
+    )
+
+    # Create sample signals
+    signals = Signals(
+        train_score=0.95,
+        val_score=0.72,
+        train_val_gap=0.23,
+        cv_mean=0.74,
+        cv_std=0.08,
+        cv_min=0.65,
+        cv_max=0.82,
+        cv_range=0.17,
+        cv_fold_scores=[0.72, 0.76, 0.65, 0.75, 0.82],
+        cv_train_val_gap=0.21,
+        n_samples_train=400,
+        n_samples_val=100,
+        n_features=20,
+        feature_to_sample_ratio=0.05,
+        residual_mean=None,
+        residual_std=None,
+        residual_skew=None,
+        residual_kurtosis=None,
+        class_distribution={0: 0.50, 1: 0.50},
+        minority_class_ratio=0.50,
+        per_class_recall={0: 0.75, 1: 0.68},
+        per_class_precision={0: 0.71, 1: 0.74},
+        confusion_matrix=[[75, 25], [32, 68]],
+        feature_correlations=None,
+        high_correlation_pairs=[(0, 10, 0.95), (1, 11, 0.92)],
+        feature_importances=None,
+        feature_target_correlations=None,
+        cv_holdout_gap=None,
+        suspicious_feature_correlations=None,
+    )
+
+    # Create sample hypotheses
+    hypotheses = [
+        Hypothesis(
+            name=FailureMode.OVERFITTING,
+            confidence=0.85,
+            severity="high",
+            evidence=[
+                "Train-val gap of 23.0% indicates overfitting",
+                "Training score: 95.0%, Validation score: 72.0%"
+            ]
+        ),
+        Hypothesis(
+            name=FailureMode.FEATURE_REDUNDANCY,
+            confidence=0.75,
+            severity="medium",
+            evidence=[
+                "2 highly correlated feature pairs detected",
+                "Feature 0 ↔ Feature 10: 95.0% correlation"
+            ]
+        )
+    ]
+
+    # Create sample recommendations
+    recommendations = [
+        Recommendation(
+            action="Increase regularization strength",
+            rationale="Stronger regularization penalizes model complexity and reduces overfitting",
+            related_hypothesis=FailureMode.OVERFITTING
+        ),
+        Recommendation(
+            action="Remove redundant features",
+            rationale="Eliminating correlated features reduces multicollinearity and improves model interpretability",
+            related_hypothesis=FailureMode.FEATURE_REDUNDANCY
+        )
+    ]
+
+    # Create the diagnosis report
+    report = DiagnosisReport(
+        hypotheses=hypotheses,
+        recommendations=recommendations,
+        signals=signals,
+        task=TaskType.CLASSIFICATION,
+        estimator_type="LogisticRegression",
+        has_pipeline=False,
+        _llm_summary="Mock summary for testing"
+    )
+
+    return report

@@ -614,5 +614,414 @@ class TestEdgeCases:
         assert len(report.recommendations) <= 3
 
 
+# ============================================================================
+# Chatbot Tests
+# ============================================================================
+
+class TestChatAgent:
+    """Test the ChatAgent class for the interactive chatbot."""
+
+    def test_chat_agent_initialization(self, sample_diagnosis_report):
+        """Test that ChatAgent initializes correctly with a diagnosis report."""
+        from sklearn_diagnose.server.chat_agent import ChatAgent
+
+        agent = ChatAgent(sample_diagnosis_report)
+
+        assert agent.report == sample_diagnosis_report
+        assert agent.conversation_history == []
+        assert agent.llm_client is not None
+
+    def test_chat_agent_requires_llm(self, sample_diagnosis_report):
+        """Test that ChatAgent fails if no LLM is configured."""
+        from sklearn_diagnose.server.chat_agent import ChatAgent
+        from sklearn_diagnose.llm.client import _set_global_client
+
+        # Temporarily remove the LLM client
+        _set_global_client(None)
+
+        with pytest.raises(RuntimeError, match="LLM client not configured"):
+            ChatAgent(sample_diagnosis_report)
+
+        # Restore for other tests (will be restored by autouse fixture anyway)
+        from tests.conftest import MockLLMClient
+        _set_global_client(MockLLMClient())
+
+    def test_chat_response(self, sample_diagnosis_report):
+        """Test that chat method produces a response."""
+        from sklearn_diagnose.server.chat_agent import ChatAgent
+
+        agent = ChatAgent(sample_diagnosis_report)
+        response = agent.chat("What issues were detected?")
+
+        assert isinstance(response, str)
+        assert len(response) > 0
+        assert len(agent.conversation_history) == 2  # user + assistant
+
+    def test_conversation_history_tracking(self, sample_diagnosis_report):
+        """Test that conversation history is properly maintained."""
+        from sklearn_diagnose.server.chat_agent import ChatAgent
+
+        agent = ChatAgent(sample_diagnosis_report)
+        agent.chat("First message")
+        agent.chat("Second message")
+
+        history = agent.get_history()
+        assert len(history) == 4  # 2 user + 2 assistant
+        assert history[0]["role"] == "user"
+        assert history[1]["role"] == "assistant"
+        assert history[2]["role"] == "user"
+        assert history[3]["role"] == "assistant"
+
+    def test_clear_history(self, sample_diagnosis_report):
+        """Test clearing conversation history."""
+        from sklearn_diagnose.server.chat_agent import ChatAgent
+
+        agent = ChatAgent(sample_diagnosis_report)
+        agent.chat("First message")
+        agent.chat("Second message")
+
+        assert len(agent.conversation_history) == 4
+
+        agent.clear_history()
+        assert len(agent.conversation_history) == 0
+
+    def test_welcome_message_generation(self, sample_diagnosis_report):
+        """Test that welcome message is generated correctly."""
+        from sklearn_diagnose.server.chat_agent import ChatAgent
+
+        agent = ChatAgent(sample_diagnosis_report)
+        welcome = agent.get_welcome_message()
+
+        assert isinstance(welcome, str)
+        assert len(welcome) > 0
+        # Should mention the issues detected
+        assert "overfitting" in welcome.lower() or "issue" in welcome.lower()
+
+    def test_welcome_message_no_issues(self, sample_diagnosis_report):
+        """Test welcome message when no issues are detected."""
+        from sklearn_diagnose.server.chat_agent import ChatAgent
+
+        # Create a report with no issues
+        report_no_issues = sample_diagnosis_report
+        report_no_issues.hypotheses = []
+
+        agent = ChatAgent(report_no_issues)
+        welcome = agent.get_welcome_message()
+
+        assert isinstance(welcome, str)
+        assert "healthy" in welcome.lower() or "no" in welcome.lower()
+
+    def test_system_prompt_includes_context(self, sample_diagnosis_report):
+        """Test that system prompt includes diagnosis context."""
+        from sklearn_diagnose.server.chat_agent import ChatAgent
+
+        agent = ChatAgent(sample_diagnosis_report)
+        system_prompt = agent._build_system_prompt()
+
+        assert isinstance(system_prompt, str)
+        assert "overfitting" in system_prompt.lower()
+        assert "recommendation" in system_prompt.lower()
+        # Should include confidence scores (85% or 85.00% or 0.85)
+        assert "85" in system_prompt and ("%" in system_prompt or "0.85" in system_prompt)
+
+
+class TestChatbotLauncher:
+    """Test the chatbot launcher functionality."""
+
+    def test_set_diagnosis_report_does_not_raise(self, sample_diagnosis_report):
+        """Test that set_diagnosis_report accepts a valid report without errors."""
+        from sklearn_diagnose.server.app import set_diagnosis_report
+
+        # This should not raise an error
+        try:
+            set_diagnosis_report(sample_diagnosis_report)
+            success = True
+        except Exception:
+            success = False
+
+        assert success, "set_diagnosis_report should not raise an exception"
+
+    def test_set_diagnosis_report_returns_none(self, sample_diagnosis_report):
+        """Test that set_diagnosis_report returns None."""
+        from sklearn_diagnose.server.app import set_diagnosis_report
+
+        result = set_diagnosis_report(sample_diagnosis_report)
+
+        assert result is None
+
+
+class TestFastAPIEndpoints:
+    """Test FastAPI endpoints (without running the server)."""
+
+    def test_get_chat_agent_after_set_report(self, sample_diagnosis_report):
+        """Test that get_chat_agent works after setting a report."""
+        from sklearn_diagnose.server.app import set_diagnosis_report, get_chat_agent
+
+        set_diagnosis_report(sample_diagnosis_report)
+        agent = get_chat_agent()
+
+        # Should return a ChatAgent instance
+        from sklearn_diagnose.server.chat_agent import ChatAgent
+        assert isinstance(agent, ChatAgent)
+        assert agent.report == sample_diagnosis_report
+
+
+class TestChatbotIntegration:
+    """Integration tests for the complete chatbot flow."""
+
+    def test_complete_chat_flow(self, sample_diagnosis_report):
+        """Test a complete chat interaction flow."""
+        from sklearn_diagnose.server.chat_agent import ChatAgent
+
+        # Create agent
+        agent = ChatAgent(sample_diagnosis_report)
+
+        # Send first message
+        response1 = agent.chat("What's the main issue with my model?")
+        assert isinstance(response1, str)
+        assert len(response1) > 0
+
+        # Send follow-up
+        response2 = agent.chat("How do I fix it?")
+        assert isinstance(response2, str)
+        assert len(response2) > 0
+
+        # Check history
+        history = agent.get_history()
+        assert len(history) == 4  # 2 user + 2 assistant
+
+        # Clear and restart
+        agent.clear_history()
+        assert len(agent.get_history()) == 0
+
+        # Can still chat after clearing
+        response3 = agent.chat("New conversation")
+        assert isinstance(response3, str)
+
+    def test_chat_with_empty_message(self, sample_diagnosis_report):
+        """Test that chatting with empty message still works (handled by API layer)."""
+        from sklearn_diagnose.server.chat_agent import ChatAgent
+
+        agent = ChatAgent(sample_diagnosis_report)
+
+        # Empty message should still produce a response (error handling is at API level)
+        response = agent.chat("")
+
+        # The agent doesn't validate input, that's the API's job
+        # So this should work at the agent level
+        assert isinstance(response, str)
+
+
+class TestRealLLMIntegration:
+    """
+    Integration tests with real LLM providers.
+
+    These tests are skipped by default. To run them, use:
+    pytest tests/test_diagnose.py::TestRealLLMIntegration -v -s
+    """
+
+    @pytest.fixture
+    def test_data(self):
+        """Generate synthetic test data with deliberate issues."""
+        from sklearn.datasets import make_classification
+
+        # Create dataset with issues (overfitting, class imbalance, redundant features)
+        X, y = make_classification(
+            n_samples=500,
+            n_features=10,
+            n_informative=5,
+            n_redundant=3,
+            n_classes=2,
+            weights=[0.9, 0.1],  # Class imbalance
+            random_state=42,
+        )
+
+        # Add highly correlated features for redundancy detection
+        X = np.column_stack([X, X[:, 0] + np.random.normal(0, 0.01, len(X))])
+        X = np.column_stack([X, X[:, 1] + np.random.normal(0, 0.01, len(X))])
+
+        X_train, X_val, y_train, y_val = train_test_split(
+            X, y, test_size=0.2, random_state=42, stratify=y
+        )
+
+        return X_train, X_val, y_train, y_val
+
+    @pytest.fixture
+    def trained_model(self, test_data):
+        """Train a model that will exhibit overfitting."""
+        X_train, X_val, y_train, y_val = test_data
+
+        # Deliberately overfit with weak regularization
+        model = LogisticRegression(C=100.0, max_iter=1000, random_state=42)
+        model.fit(X_train, y_train)
+
+        return model
+
+    @pytest.mark.skip(reason="Integration test with real LLM - run manually")
+    def test_openai_integration(self, test_data, trained_model):
+        """Test with OpenAI GPT models."""
+        from sklearn_diagnose import setup_llm, diagnose
+        from sklearn_diagnose.llm.client import _set_global_client
+        import os
+
+        X_train, X_val, y_train, y_val = test_data
+
+        print("\n" + "=" * 70)
+        print("TESTING OPENAI INTEGRATION")
+        print("=" * 70)
+
+        # Try specified model first, then fallback to known working model
+        models_to_try = ["gpt-5.2", "gpt-4o", "gpt-4o-mini"]
+
+        for model_name in models_to_try:
+            try:
+                print(f"\nTrying OpenAI model: {model_name}")
+                setup_llm(
+                    provider="openai",
+                    model=model_name,
+                    api_key=os.getenv("OPENAI_API_KEY")
+                )
+
+                print("Running diagnosis...")
+                report = diagnose(
+                    estimator=trained_model,
+                    datasets={"train": (X_train, y_train), "val": (X_val, y_val)},
+                    task="classification"
+                )
+
+                print("\n✓ OpenAI diagnosis successful!")
+                print(f"✓ Model used: {model_name}")
+                print(f"✓ Detected {len(report.hypotheses)} issues")
+                print(f"✓ Generated {len(report.recommendations)} recommendations")
+
+                # Print summary
+                print("\n" + "-" * 70)
+                print("DIAGNOSIS SUMMARY")
+                print("-" * 70)
+                print(report.summary())
+
+                # Success - break out of loop
+                break
+
+            except Exception as e:
+                print(f"✗ Failed with {model_name}: {str(e)}")
+                if model_name == models_to_try[-1]:
+                    pytest.fail(f"All OpenAI models failed. Last error: {str(e)}")
+                continue
+
+        # Clean up
+        _set_global_client(None)
+
+    @pytest.mark.skip(reason="Integration test with real LLM - run manually")
+    def test_anthropic_integration(self, test_data, trained_model):
+        """Test with Anthropic Claude models."""
+        from sklearn_diagnose import setup_llm, diagnose
+        from sklearn_diagnose.llm.client import _set_global_client
+        import os
+
+        X_train, X_val, y_train, y_val = test_data
+
+        print("\n" + "=" * 70)
+        print("TESTING ANTHROPIC INTEGRATION")
+        print("=" * 70)
+
+        # Try specified model first, then fallback to known working model
+        models_to_try = ["claude-opus-4-5", "claude-opus-4-20250514", "claude-3-5-sonnet-latest"]
+
+        for model_name in models_to_try:
+            try:
+                print(f"\nTrying Anthropic model: {model_name}")
+                setup_llm(
+                    provider="anthropic",
+                    model=model_name,
+                    api_key=os.getenv("ANTHROPIC_API_KEY")
+                )
+
+                print("Running diagnosis...")
+                report = diagnose(
+                    estimator=trained_model,
+                    datasets={"train": (X_train, y_train), "val": (X_val, y_val)},
+                    task="classification"
+                )
+
+                print("\n✓ Anthropic diagnosis successful!")
+                print(f"✓ Model used: {model_name}")
+                print(f"✓ Detected {len(report.hypotheses)} issues")
+                print(f"✓ Generated {len(report.recommendations)} recommendations")
+
+                # Print summary
+                print("\n" + "-" * 70)
+                print("DIAGNOSIS SUMMARY")
+                print("-" * 70)
+                print(report.summary())
+
+                # Success - break out of loop
+                break
+
+            except Exception as e:
+                print(f"✗ Failed with {model_name}: {str(e)}")
+                if model_name == models_to_try[-1]:
+                    pytest.fail(f"All Anthropic models failed. Last error: {str(e)}")
+                continue
+
+        # Clean up
+        _set_global_client(None)
+
+    @pytest.mark.skip(reason="Integration test with real LLM - run manually")
+    def test_openrouter_integration(self, test_data, trained_model):
+        """Test with OpenRouter DeepSeek models."""
+        from sklearn_diagnose import setup_llm, diagnose
+        from sklearn_diagnose.llm.client import _set_global_client
+        import os
+
+        X_train, X_val, y_train, y_val = test_data
+
+        print("\n" + "=" * 70)
+        print("TESTING OPENROUTER INTEGRATION")
+        print("=" * 70)
+
+        # Try specified model first, then fallback to known working model
+        models_to_try = ["deepseek/deepseek-v3.2", "deepseek/deepseek-v3", "deepseek/deepseek-chat"]
+
+        for model_name in models_to_try:
+            try:
+                print(f"\nTrying OpenRouter model: {model_name}")
+                setup_llm(
+                    provider="openrouter",
+                    model=model_name,
+                    api_key=os.getenv("OPENROUTER_API_KEY")
+                )
+
+                print("Running diagnosis...")
+                report = diagnose(
+                    estimator=trained_model,
+                    datasets={"train": (X_train, y_train), "val": (X_val, y_val)},
+                    task="classification"
+                )
+
+                print("\n✓ OpenRouter diagnosis successful!")
+                print(f"✓ Model used: {model_name}")
+                print(f"✓ Detected {len(report.hypotheses)} issues")
+                print(f"✓ Generated {len(report.recommendations)} recommendations")
+
+                # Print summary
+                print("\n" + "-" * 70)
+                print("DIAGNOSIS SUMMARY")
+                print("-" * 70)
+                print(report.summary())
+
+                # Success - break out of loop
+                break
+
+            except Exception as e:
+                print(f"✗ Failed with {model_name}: {str(e)}")
+                if model_name == models_to_try[-1]:
+                    pytest.fail(f"All OpenRouter models failed. Last error: {str(e)}")
+                continue
+
+        # Clean up
+        _set_global_client(None)
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

@@ -71,12 +71,16 @@ from .core import (
 # LLM configuration
 from .llm import setup_llm
 
+# Chatbot
+from .chatbot import launch_chatbot
+
 __all__ = [
     # Version
     "__version__",
     # Main API
     "diagnose",
     "setup_llm",
+    "launch_chatbot",
     # Types
     "DiagnosisReport",
     "Hypothesis",

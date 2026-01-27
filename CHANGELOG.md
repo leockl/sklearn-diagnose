@@ -7,7 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.1.0] - 2025-01-02
+### Added
+
+- **Interactive Chatbot**: Web-based chatbot for exploring diagnosis results through conversation
+  - FastAPI backend with REST API endpoints (`/api/chat`, `/api/report`, `/api/welcome`)
+  - React + Vite frontend with bundled static files
+  - Single-port architecture (serves both API and frontend on port 8000)
+  - Conversation history tracking with clear/reset capability
+  - Context-aware responses using ChatAgent with diagnosis report context
+  - Automatic browser launch via `launch_chatbot()` function
+  - Welcome message generation based on detected issues
+- `ChatAgent` class for managing LLM-powered conversations about diagnosis results
+- Chatbot dependencies now included by default (FastAPI, Uvicorn, python-multipart)
+- Example script (`tests/example_diagnose.py`) demonstrating complete workflow with chatbot
+- Frontend components: ChatInterface, MessageList, MessageBubble, DiagnosisPanel
+
+### Changed
+
+- Chatbot dependencies (FastAPI, Uvicorn, python-multipart) moved from optional to required
+- Test file renamed from `test_diagnose.py` to `unit_test_diagnose.py`
+
+## [0.1.1] - 2025-01-28
 
 ### Added
 

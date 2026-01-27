@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sklearn-diagnose"
-version = "0.1.0"
+version = "0.1.1"
 description = "An intelligent diagnosis layer for scikit-learn: evidence-based model failure detection with LLM-powered summaries"
 readme = "README.md"
 license = {text = "MIT"}
@@ -51,6 +51,10 @@ dependencies = [
     "langgraph>=0.4.0",
     "pydantic>=2.0.0",
     "python-dotenv>=1.0.0",
+    # Chatbot dependencies
+    "fastapi>=0.100.0",
+    "uvicorn[standard]>=0.23.0",
+    "python-multipart>=0.0.6",
 ]
 
 [project.optional-dependencies]

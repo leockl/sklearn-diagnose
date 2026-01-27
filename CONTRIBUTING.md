@@ -55,10 +55,10 @@ pytest
 pytest --cov=sklearn_diagnose
 
 # Run specific test file
-pytest tests/test_diagnose.py
+pytest tests/unit_test_diagnose.py
 
 # Run specific test
-pytest tests/test_diagnose.py::TestBasicFunctionality::test_diagnose_logistic_regression
+pytest tests/unit_test_diagnose.py::TestBasicFunctionality::test_diagnose_logistic_regression
 ```
 
 ### Writing Tests
@@ -67,10 +67,74 @@ pytest tests/test_diagnose.py::TestBasicFunctionality::test_diagnose_logistic_re
 - Tests go in the `tests/` directory
 - Follow existing test patterns (use pytest fixtures, descriptive names)
 - Aim for high coverage of edge cases
+- Chatbot tests are included in `tests/unit_test_diagnose.py` (classes: `TestChatAgent`, `TestChatbotLauncher`, `TestFastAPIEndpoints`)
+
+### Frontend Development
+
+The interactive chatbot uses a React + Vite frontend bundled with the Python package.
+
+#### Development Setup
+
+1. Install Node.js dependencies:
+   ```bash
+   cd frontend
+   npm install
+   ```
+
+2. Start the development server:
+   ```bash
+   npm run dev
+   ```
+   The frontend will run on `http://localhost:8001` and proxy API requests to `http://localhost:8000`.
+
+3. In a separate terminal, run the Python backend:
+   ```bash
+   python tests/example_diagnose.py
+   ```
+
+#### Building for Production
+
+To update the bundled frontend in the Python package:
+
+```bash
+cd frontend
+npm run build
+```
+
+This creates production files in `frontend/dist/` which are automatically copied to `sklearn_diagnose/server/static/` and included in the pip package via `MANIFEST.in`.
+
+#### Frontend Structure
+
+```
+frontend/
+├── src/
+│   ├── components/      # React components
+│   │   ├── Header.jsx
+│   │   ├── ChatInterface.jsx
+│   │   ├── MessageList.jsx
+│   │   ├── MessageBubble.jsx
+│   │   └── DiagnosisPanel.jsx
+│   ├── hooks/          # Custom React hooks
+│   │   └── useChat.js
+│   ├── services/       # API client
+│   │   └── api.js
+│   └── App.jsx         # Main app component
+├── vite.config.js      # Vite configuration
+└── tailwind.config.js  # Tailwind CSS configuration
+```
+
+#### Frontend Testing
+
+When making frontend changes:
+
+1. Test in development mode (`npm run dev`)
+2. Build for production (`npm run build`)
+3. Test the bundled version by running `python tests/example_diagnose.py`
+4. Verify the chatbot works at `http://localhost:8000`
 
 ## Architecture Overview
 
-sklearn-diagnose follows an LLM-driven architecture:
+sklearn-diagnose follows an LLM-driven architecture with both batch and interactive modes:
 
 ```
 Layer 1: Signal Extractors (core/signals.py)
@@ -81,6 +145,8 @@ Layer 3: LLM Recommendation Generation (llm/client.py)
     ↓ Actionable recommendations
 Layer 4: LLM Summary Generation (llm/client.py)
     ↓ Human-readable summaries
+Layer 5: Interactive Chatbot (server/chat_agent.py + frontend)
+    ↓ Web-based Q&A interface
 ```
 
 ### Key Principles
@@ -90,6 +156,7 @@ Layer 4: LLM Summary Generation (llm/client.py)
 3. **Read-only**: Never modify the estimator or input data
 4. **Confidence-weighted**: Express uncertainty with confidence scores (0.0 - 0.95)
 5. **Example-guided**: LLM uses example templates as guidance for recommendations
+6. **Interactive**: Chatbot provides conversational access to diagnosis results
 
 ## Submitting Changes
 

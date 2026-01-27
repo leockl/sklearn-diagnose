@@ -4,7 +4,7 @@
 
 ## Overview
 
-sklearn-diagnose uses a **multi-agent architecture** powered by [LangChain](https://langchain.com/) to diagnose machine learning model failures. The system employs three specialized AI agents, each responsible for a specific stage of the diagnostic pipeline.
+sklearn-diagnose uses a **multi-agent architecture** powered by [LangChain](https://langchain.com/) to diagnose machine learning model failures. The system employs four specialized AI agents: three for batch diagnosis and one for interactive conversation.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
@@ -37,6 +37,16 @@ sklearn-diagnose uses a **multi-agent architecture** powered by [LangChain](http
 │   │                    SUMMARY AGENT                             │   │
 │   │   Synthesizes findings → Creates human-readable report       │   │
 │   │   Output: Markdown-formatted diagnostic summary              │   │
+│   └─────────────────────────────────────────────────────────────┘   │
+│                         │                                            │
+│                         ▼                                            │
+│                  DiagnosisReport                                     │
+│                         │                                            │
+│                         ▼                                            │
+│   ┌─────────────────────────────────────────────────────────────┐   │
+│   │                     CHAT AGENT (Interactive)                 │   │
+│   │   User conversations → Context-aware Q&A                     │   │
+│   │   Output: Interactive responses with conversation history    │   │
 │   └─────────────────────────────────────────────────────────────┘   │
 │                                                                      │
 └─────────────────────────────────────────────────────────────────────┘
@@ -230,6 +240,107 @@ Based on the analysis, here are the key findings:
 
 ---
 
+### 4. Chat Agent
+
+**Purpose**: Enable interactive conversations about diagnosis results through a web-based chatbot interface.
+
+**Role**: Conversational ML assistant that answers user questions about their model's diagnosis, provides explanations, and offers code examples.
+
+| Property | Value |
+|----------|-------|
+| **Location** | `sklearn_diagnose/server/chat_agent.py` |
+| **Class** | `ChatAgent` |
+| **Input** | DiagnosisReport, User message (str) |
+| **Output** | Conversational response (str) |
+
+#### Architecture
+
+Unlike the batch-processing agents (Hypothesis, Recommendation, Summary), the Chat Agent is **interactive** and **stateful**:
+
+- Maintains conversation history across multiple turns
+- Uses the DiagnosisReport as context for all responses
+- Generates a welcome message based on detected issues
+- Supports clearing/resetting conversation history
+
+#### System Prompt
+
+```
+You are an expert ML diagnostician assistant helping users understand and fix
+issues with their machine learning models.
+
+You have access to a diagnosis report containing:
+- Detected issues (hypotheses) with confidence scores and evidence
+- Actionable recommendations to fix the issues
+- Performance metrics and signals
+
+Your role is to:
+1. Answer questions about the diagnosis in a clear, conversational manner
+2. Explain technical concepts when needed
+3. Provide code examples when asked
+4. Help users understand how to implement the recommendations
+5. Be encouraging and supportive while being technically accurate
+
+Guidelines:
+- Be concise but complete
+- Use specific numbers and evidence from the diagnosis
+- Suggest concrete next steps when appropriate
+- If asked for code, provide working Python examples
+- Always ground your responses in the actual diagnosis data
+```
+
+#### Key Methods
+
+```python
+class ChatAgent:
+    def __init__(self, report: DiagnosisReport):
+        """Initialize agent with diagnosis report."""
+
+    def chat(self, message: str) -> str:
+        """Process user message and return response."""
+
+    def get_welcome_message(self) -> str:
+        """Generate welcome message based on detected issues."""
+
+    def get_history(self) -> List[Dict[str, str]]:
+        """Retrieve conversation history."""
+
+    def clear_history(self) -> None:
+        """Reset conversation to start fresh."""
+```
+
+#### Usage Example
+
+```python
+from sklearn_diagnose import diagnose, launch_chatbot
+
+# Run diagnosis
+report = diagnose(model, datasets, task="classification")
+
+# Launch interactive chatbot (opens browser automatically)
+launch_chatbot(report)
+
+# Or use ChatAgent directly in Python
+from sklearn_diagnose.server.chat_agent import ChatAgent
+
+agent = ChatAgent(report)
+response = agent.chat("What are the main issues with my model?")
+print(response)
+```
+
+#### Web Interface
+
+The Chat Agent is exposed through a FastAPI web server with:
+
+- **Frontend**: React + Vite SPA with bundled static files
+- **Backend**: FastAPI REST API with endpoints:
+  - `POST /api/chat` - Send message, receive response
+  - `GET /api/report` - Retrieve diagnosis report
+  - `GET /api/welcome` - Get welcome message
+  - `POST /api/clear` - Clear conversation history
+- **Single-port architecture**: Both frontend and API served on port 8000
+
+---
+
 ## Implementation Details
 
 ### LangChain Integration
@@ -265,7 +376,7 @@ result = agent.invoke({"messages": [system_message, user_message]})
 from sklearn_diagnose import setup_llm
 setup_llm(provider="openai", model="gpt-4o")
 
-# 2. Run diagnosis (invokes all 3 agents sequentially)
+# 2. Run diagnosis (invokes 3 batch agents sequentially)
 from sklearn_diagnose import diagnose
 report = diagnose(model, datasets, task="classification")
 
@@ -274,6 +385,10 @@ report = diagnose(model, datasets, task="classification")
 # ├── Hypothesis Agent → report.hypotheses
 # ├── Recommendation Agent → report.recommendations
 # └── Summary Agent → report.summary()
+
+# 3. (Optional) Launch interactive chatbot (4th agent)
+from sklearn_diagnose import launch_chatbot
+launch_chatbot(report)  # Opens browser, starts Chat Agent
 ```
 
 ---
@@ -296,6 +411,15 @@ Signals (dict)
                                                            ▼
                                             ┌─────────────────────┐
                                             │    Summary Agent     │──► summary: str
+                                            └─────────────────────┘
+                                                           │
+                                                           ▼
+                                                   DiagnosisReport (all findings)
+                                                           │
+                                                           ▼
+                                            ┌─────────────────────┐
+                                            │    Chat Agent        │──► Interactive Q&A
+                                            │    (Interactive)     │    (stateful)
                                             └─────────────────────┘
 ```
 

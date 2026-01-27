@@ -1,0 +1,73 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+/* Code block overflow handling */
+.prose pre {
+  max-width: 100%;
+  overflow-x: auto;
+  word-wrap: normal;
+  white-space: pre;
+  background-color: #2d3748 !important;
+  color: #e2e8f0 !important;
+  padding: 1rem !important;
+  border-radius: 0.5rem !important;
+  margin: 0.5rem 0 !important;
+  border: 1px solid #4a5568 !important;
+}
+
+.prose pre code {
+  display: block;
+  overflow-wrap: normal;
+  word-break: normal;
+  background-color: transparent !important;
+  color: inherit !important;
+  padding: 0 !important;
+}
+
+.prose code:not(pre code) {
+  word-break: break-word;
+  overflow-wrap: break-word;
+  background-color: #e2e8f0 !important;
+  color: #2d3748 !important;
+  padding: 0.125rem 0.25rem !important;
+  border-radius: 0.25rem !important;
+  font-size: 0.875em !important;
+}
+
+.prose p, .prose li {
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
